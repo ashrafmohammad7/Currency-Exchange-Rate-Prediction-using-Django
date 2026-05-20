@@ -18,15 +18,8 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
 def _get_model(pair, model_name):
-    """Load model — auto-retrain if pkl incompatible (sklearn version mismatch)"""
-    try:
-        model, scaler, feature_cols = load_model(pair, model_name)
-        model.predict(np.zeros((1, len(feature_cols))))
-        return model, scaler, feature_cols
-    except Exception:
-        print(f"  Re-training {model_name} for {pair} due to version mismatch...")
-        train_single_model(pair, model_name, days=500, force_train=True)
-        return load_model(pair, model_name)
+    model, scaler, feature_cols = load_model(pair, model_name)
+    return model, scaler, feature_cols
 
 
 def _evaluate(model, scaler, pair):
@@ -131,12 +124,7 @@ def compare_models(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def retrain(request):
-    try:
-        data       = json.loads(request.body)
-        pair       = data.get("pair",  "USD/EUR")
-        model_name = data.get("model", "random_forest")
-        days       = int(data.get("days", 500))
-        metrics    = train_single_model(pair, model_name, days=days, force_train=True)
-        return JsonResponse({"success": True, "metrics": metrics})
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=500)
+    return JsonResponse({
+        "success": False,
+        "error": "Retraining disabled on Vercel"
+    })
