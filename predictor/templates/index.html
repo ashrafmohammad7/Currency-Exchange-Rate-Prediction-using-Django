@@ -1,0 +1,182 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ForexML — Currency Prediction Engine</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+</head>
+<body>
+  <!-- Background grid -->
+  <div class="bg-grid"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <span class="logo-icon">⬡</span>
+      <span class="logo-text">ForexML</span>
+      <span class="logo-badge">AI Engine</span>
+    </div>
+    <div class="header-stats" id="headerStats">
+      <div class="hstat"><span class="hstat-label">Status</span><span class="hstat-val online">● Live</span></div>
+      <div class="hstat"><span class="hstat-label">Data Source</span><span class="hstat-val" id="dataSource">—</span></div>
+      <div class="hstat"><span class="hstat-label">Model</span><span class="hstat-val" id="activeModel">—</span></div>
+      <div class="hstat"><span class="hstat-label">Accuracy</span><span class="hstat-val" id="activeAcc">—</span></div>
+    </div>
+  </header>
+
+  <main class="main">
+    <!-- Control Panel -->
+    <section class="panel control-panel">
+      <div class="panel-label">CONTROL PANEL</div>
+      <div class="controls-grid">
+        <div class="control-group">
+          <label class="ctrl-label">Currency Pair</label>
+          <div class="select-wrap">
+            <select id="currencyPair" class="ctrl-select">
+              {% for pair in currency_pairs %}
+              <option value="{{ pair }}">{{ pair }}</option>
+              {% endfor %}
+            </select>
+            <span class="select-arrow">▾</span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label class="ctrl-label">ML Model</label>
+          <div class="select-wrap">
+            <select id="mlModel" class="ctrl-select">
+              <option value="random_forest">Random Forest</option>
+              <option value="gradient_boost">Gradient Boost</option>
+              <option value="linear">Linear Regression</option>
+            </select>
+            <span class="select-arrow">▾</span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label class="ctrl-label">Forecast Days</label>
+          <div class="select-wrap">
+            <select id="predDays" class="ctrl-select">
+              <option value="3">3 Days</option>
+              <option value="7" selected>7 Days</option>
+              <option value="14">14 Days</option>
+              <option value="30">30 Days</option>
+            </select>
+            <span class="select-arrow">▾</span>
+          </div>
+        </div>
+
+        <button class="predict-btn" id="predictBtn" onclick="runPrediction()">
+          <span class="btn-icon">◈</span>
+          <span class="btn-text">Run Prediction</span>
+          <div class="btn-shimmer"></div>
+        </button>
+
+        <button class="compare-btn" id="compareBtn" onclick="compareModels()">
+          <span class="btn-icon">⊞</span>
+          <span class="btn-text">Compare Models</span>
+        </button>
+
+        <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">
+          <span class="btn-icon">↻</span>
+          <span class="btn-text">Refresh Data</span>
+        </button>
+      </div>
+
+      <!-- Data source info bar -->
+      <div class="data-info-bar" id="dataInfoBar" style="display:none">
+        <span class="data-badge" id="dataBadge">—</span>
+        <span class="data-detail" id="dataDetail">—</span>
+      </div>
+    </section>
+
+    <!-- Metrics Row -->
+    <div class="metrics-row" id="metricsRow" style="display:none">
+      <div class="metric-card" id="mc-rate">
+        <div class="metric-icon">💱</div>
+        <div class="metric-body">
+          <div class="metric-label">Current Rate</div>
+          <div class="metric-value" id="mRate">—</div>
+        </div>
+      </div>
+      <div class="metric-card" id="mc-acc">
+        <div class="metric-icon">🎯</div>
+        <div class="metric-body">
+          <div class="metric-label">Accuracy</div>
+          <div class="metric-value accent" id="mAcc">—</div>
+        </div>
+      </div>
+      <div class="metric-card" id="mc-mae">
+        <div class="metric-icon">📉</div>
+        <div class="metric-body">
+          <div class="metric-label">MAE</div>
+          <div class="metric-value" id="mMae">—</div>
+        </div>
+      </div>
+      <div class="metric-card" id="mc-r2">
+        <div class="metric-icon">📊</div>
+        <div class="metric-body">
+          <div class="metric-label">R² Score</div>
+          <div class="metric-value" id="mR2">—</div>
+        </div>
+      </div>
+      <div class="metric-card" id="mc-mape">
+        <div class="metric-icon">📈</div>
+        <div class="metric-body">
+          <div class="metric-label">MAPE</div>
+          <div class="metric-value" id="mMape">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart Area -->
+    <section class="panel chart-panel" id="chartPanel" style="display:none">
+      <div class="panel-header">
+        <div class="panel-label">PREDICTION CHART</div>
+        <div class="chart-legend">
+          <span class="leg historical">── Historical</span>
+          <span class="leg predicted">── Predicted</span>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="mainChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Predictions Table + Model Comparison side by side -->
+    <div class="bottom-row">
+      <section class="panel table-panel" id="tablePanel" style="display:none">
+        <div class="panel-label">FORECAST TABLE</div>
+        <table class="pred-table">
+          <thead>
+            <tr><th>Date</th><th>Predicted Rate</th><th>Change</th></tr>
+          </thead>
+          <tbody id="predTableBody"></tbody>
+        </table>
+      </section>
+
+      <section class="panel compare-panel" id="comparePanel" style="display:none">
+        <div class="panel-label">MODEL COMPARISON</div>
+        <div id="compareContent"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay" style="display:none">
+    <div class="loader-box">
+      <div class="loader-ring"></div>
+      <div class="loader-text" id="loaderText">Training model…</div>
+    </div>
+  </div>
+
+  <script src="{% static 'js/main.js' %}"></script>
+</body>
+</html>
