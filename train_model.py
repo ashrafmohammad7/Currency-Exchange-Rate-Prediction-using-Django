@@ -219,237 +219,194 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     df.reset_index(drop=True, inplace=True)
     return df
 
-
-<<<<<<< HEAD
-def train_single_model(pair: str, model_name: str, days: int = 730, cv_folds: int = 5, force_train: bool = False) -> dict:
-    safe = pair.replace("/", "_")
-    model_path = os.path.join(MODELS_DIR, f"{safe}_{model_name}_model.pkl")
-
-    model_exists = False
-    if not force_train and os.path.exists(model_path):
-        try:
-            model, scaler, feature_cols = load_model(pair, model_name)
-            model.predict(np.zeros((1, len(feature_cols))))
-            model_exists = True
-        except Exception:
-            pass
-
-    if model_exists:
-        print(f"\n  Predicting with existing [{model_name}] on {pair} ...")
-    else:
-        print(f"\n  Training [{model_name}] on {pair} ...")
-
-    raw_df      = generate_historical_data(pair, days=days)
-    csv_exists  = os.path.exists(os.path.join(DATA_DIR, f"{safe}.csv"))
-=======
 def train_single_model(pair: str, model_name: str, days: int = 730, cv_folds: int = 5) -> dict:
-    print(f"\n  Training [{model_name}] on {pair} ...")
 
-    raw_df      = generate_historical_data(pair, days=days)
-    csv_exists  = os.path.exists(os.path.join(DATA_DIR, f"{pair.replace('/','_')}.csv"))
->>>>>>> be43cc49f9ed94f53c57c5b2259e5dc3cffc5841
+    print(f"\nTraining [{model_name}] on {pair} ...")
+
+    raw_df = generate_historical_data(pair, days=days)
+
+    csv_exists = os.path.exists(
+        os.path.join(DATA_DIR, f"{pair.replace('/','_')}.csv")
+    )
+
     data_source = "REAL" if csv_exists else "SYNTHETIC"
 
-    print(f"     Data Source : {'🌐 REAL Yahoo Finance' if data_source=='REAL' else '🔁 Synthetic'}")
-    print(f"     Rows        : {len(raw_df)}  ({raw_df['date'].iloc[0]} → {raw_df['date'].iloc[-1]})")
-    print(f"     Latest Rate : {raw_df['rate'].iloc[-1]}")
+    df = create_features(raw_df)
 
-    df           = create_features(raw_df)
     FEATURE_COLS = [c for c in df.columns if c not in ("date", "rate")]
-    X            = df[FEATURE_COLS].values
-    y            = df["rate"].values
-    split        = int(len(X) * 0.80)
-    X_tr, X_te   = X[:split], X[split:]
-    y_tr, y_te   = y[:split], y[split:]
 
-<<<<<<< HEAD
-    if model_exists:
-        X_te_sc = scaler.transform(X_te)
-    else:
-        scaler   = MinMaxScaler()
-        X_tr_sc  = scaler.fit_transform(X_tr)
-        X_te_sc  = scaler.transform(X_te)
+    X = df[FEATURE_COLS].values
+    y = df["rate"].values
 
-        model = copy.deepcopy(MODEL_REGISTRY[model_name])
-        model.fit(X_tr_sc, y_tr)
-=======
-    scaler   = MinMaxScaler()
-    X_tr_sc  = scaler.fit_transform(X_tr)
-    X_te_sc  = scaler.transform(X_te)
+    split = int(len(X) * 0.80)
+
+    X_tr, X_te = X[:split], X[split:]
+    y_tr, y_te = y[:split], y[split:]
+
+    scaler = MinMaxScaler()
+
+    X_tr_sc = scaler.fit_transform(X_tr)
+    X_te_sc = scaler.transform(X_te)
 
     model = copy.deepcopy(MODEL_REGISTRY[model_name])
+
     model.fit(X_tr_sc, y_tr)
->>>>>>> be43cc49f9ed94f53c57c5b2259e5dc3cffc5841
 
     y_pred = model.predict(X_te_sc)
-    mae    = float(mean_absolute_error(y_te, y_pred))
-    rmse   = float(math.sqrt(mean_squared_error(y_te, y_pred)))
-    r2     = float(r2_score(y_te, y_pred))
-    mape   = float(np.mean(np.abs((y_te - y_pred) / (y_te + 1e-10))) * 100)
-    acc    = float(max(0.0, min(100.0, (1 - mae / np.mean(y_te)) * 100)))
 
-<<<<<<< HEAD
-    if model_exists:
-        cv_mae_val = 0.0
-    else:
-        tscv      = TimeSeriesSplit(n_splits=cv_folds)
-        cv_scores = cross_val_score(
-            copy.deepcopy(model), scaler.transform(X), y,
-            cv=tscv, scoring="neg_mean_absolute_error"
-        )
-        cv_mae_val = float(-cv_scores.mean())
-=======
-    tscv      = TimeSeriesSplit(n_splits=cv_folds)
-    cv_scores = cross_val_score(
-        copy.deepcopy(model), scaler.transform(X), y,
-        cv=tscv, scoring="neg_mean_absolute_error"
+    mae = float(mean_absolute_error(y_te, y_pred))
+    rmse = float(math.sqrt(mean_squared_error(y_te, y_pred)))
+    r2 = float(r2_score(y_te, y_pred))
+
+    mape = float(
+        np.mean(np.abs((y_te - y_pred) / (y_te + 1e-10))) * 100
     )
->>>>>>> be43cc49f9ed94f53c57c5b2259e5dc3cffc5841
+
+    acc = float(
+        max(0.0, min(100.0, (1 - mae / np.mean(y_te)) * 100))
+    )
+
+    tscv = TimeSeriesSplit(n_splits=cv_folds)
+
+    cv_scores = cross_val_score(
+        copy.deepcopy(model),
+        scaler.transform(X),
+        y,
+        cv=tscv,
+        scoring="neg_mean_absolute_error"
+    )
 
     metrics = {
-        "pair": pair, "model": model_name, "data_source": data_source,
-        "mae": round(mae,6), "rmse": round(rmse,6), "r2": round(r2,4),
-        "mape": round(mape,4), "accuracy": round(acc,2),
-<<<<<<< HEAD
-        "cv_mae": round(cv_mae_val,6),
-=======
-        "cv_mae": round(float(-cv_scores.mean()),6),
->>>>>>> be43cc49f9ed94f53c57c5b2259e5dc3cffc5841
-        "train_rows": int(split), "test_rows": int(len(X)-split),
-        "features": len(FEATURE_COLS),
-        "data_start": raw_df["date"].iloc[0],
-        "data_end":   raw_df["date"].iloc[-1],
-        "latest_rate": float(raw_df["rate"].iloc[-1]),
-        "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "pair": pair,
+        "model": model_name,
+        "data_source": data_source,
+        "mae": round(mae, 6),
+        "rmse": round(rmse, 6),
+        "r2": round(r2, 4),
+        "mape": round(mape, 4),
+        "accuracy": round(acc, 2),
+        "cv_mae": round(float(-cv_scores.mean()), 6),
     }
 
-<<<<<<< HEAD
-    if not model_exists:
-        joblib.dump(model,        os.path.join(MODELS_DIR, f"{safe}_{model_name}_model.pkl"))
-        joblib.dump(scaler,       os.path.join(MODELS_DIR, f"{safe}_{model_name}_scaler.pkl"))
-        joblib.dump(FEATURE_COLS, os.path.join(MODELS_DIR, f"{safe}_{model_name}_features.pkl"))
-=======
     safe = pair.replace("/", "_")
-    joblib.dump(model,        os.path.join(MODELS_DIR, f"{safe}_{model_name}_model.pkl"))
-    joblib.dump(scaler,       os.path.join(MODELS_DIR, f"{safe}_{model_name}_scaler.pkl"))
-    joblib.dump(FEATURE_COLS, os.path.join(MODELS_DIR, f"{safe}_{model_name}_features.pkl"))
->>>>>>> be43cc49f9ed94f53c57c5b2259e5dc3cffc5841
 
-    bar = "─"*50
-    print(f"     {bar}")
-    print(f"     Accuracy : {acc:>8.2f} %")
-    print(f"     MAE      : {mae:>14.6f}")
-    print(f"     RMSE     : {rmse:>14.6f}")
-    print(f"     R²       : {r2:>8.4f}")
-    print(f"     MAPE     : {mape:>8.4f} %")
-    print(f"     CV-MAE   : {metrics['cv_mae']:>14.6f}")
-    print(f"     {bar}")
+    joblib.dump(
+        model,
+        os.path.join(MODELS_DIR, f"{safe}_{model_name}_model.pkl")
+    )
+
+    joblib.dump(
+        scaler,
+        os.path.join(MODELS_DIR, f"{safe}_{model_name}_scaler.pkl")
+    )
+
+    joblib.dump(
+        FEATURE_COLS,
+        os.path.join(MODELS_DIR, f"{safe}_{model_name}_features.pkl")
+    )
+
     return metrics
 
 
 def load_model(pair: str, model_name: str):
+
     safe = pair.replace("/", "_")
-    paths = {
-        "model":    os.path.join(MODELS_DIR, f"{safe}_{model_name}_model.pkl"),
-        "scaler":   os.path.join(MODELS_DIR, f"{safe}_{model_name}_scaler.pkl"),
-        "features": os.path.join(MODELS_DIR, f"{safe}_{model_name}_features.pkl"),
-    }
-    for key, path in paths.items():
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Missing {key}: {path}")
+
     return (
-        joblib.load(paths["model"]),
-        joblib.load(paths["scaler"]),
-        joblib.load(paths["features"]),
+        joblib.load(os.path.join(MODELS_DIR, f"{safe}_{model_name}_model.pkl")),
+        joblib.load(os.path.join(MODELS_DIR, f"{safe}_{model_name}_scaler.pkl")),
+        joblib.load(os.path.join(MODELS_DIR, f"{safe}_{model_name}_features.pkl")),
     )
 
 
-def predict_future(model, scaler, feature_cols: list,
-                   pair: str, days: int = 7, history_days: int = 730) -> list:
-    df_work     = generate_historical_data(pair, days=history_days)
+def predict_future(model, scaler, feature_cols, pair, days=7, history_days=730):
+
+    df_work = generate_historical_data(pair, days=history_days)
+
     predictions = []
+
     for _ in range(days):
-        df_feat  = create_features(df_work)
+
+        df_feat = create_features(df_work)
+
         if df_feat.empty:
             break
-        last_sc  = scaler.transform(df_feat[feature_cols].iloc[-1:].values)
-        pred     = round(float(model.predict(last_sc)[0]), 6)
-        next_dt  = (datetime.strptime(df_work["date"].iloc[-1], "%Y-%m-%d")
-                    + timedelta(days=1)).strftime("%Y-%m-%d")
-        predictions.append({"date": next_dt, "predicted_rate": pred})
-        df_work  = pd.concat(
-            [df_work, pd.DataFrame({"date": [next_dt], "rate": [pred]})],
+
+        last_sc = scaler.transform(
+            df_feat[feature_cols].iloc[-1:].values
+        )
+
+        pred = round(float(model.predict(last_sc)[0]), 6)
+
+        next_dt = (
+            datetime.strptime(df_work["date"].iloc[-1], "%Y-%m-%d")
+            + timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+
+        predictions.append({
+            "date": next_dt,
+            "predicted_rate": pred
+        })
+
+        df_work = pd.concat(
+            [
+                df_work,
+                pd.DataFrame({
+                    "date": [next_dt],
+                    "rate": [pred]
+                })
+            ],
             ignore_index=True
         )
+
     return predictions
 
 
 def main():
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pair",  type=str, default=None)
-    parser.add_argument("--model", type=str, default=None, choices=list(MODEL_REGISTRY.keys()))
-    parser.add_argument("--days",  type=int, default=730)
-    parser.add_argument("--all",   action="store_true")
-<<<<<<< HEAD
-    parser.add_argument("--force", action="store_true", help="Force retrain existing models")
-=======
->>>>>>> be43cc49f9ed94f53c57c5b2259e5dc3cffc5841
+
+    parser.add_argument("--pair", type=str, default=None)
+
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        choices=list(MODEL_REGISTRY.keys())
+    )
+
+    parser.add_argument("--days", type=int, default=730)
+
+    parser.add_argument("--all", action="store_true")
+
     args = parser.parse_args()
 
-    pairs  = list(CURRENCY_PAIRS.keys()) if (args.all or not args.pair)  else [args.pair]
-    models = list(MODEL_REGISTRY.keys()) if (args.all or not args.model) else [args.model]
-
-    total = len(pairs) * len(models)
-    done  = 0
-    summary = []
-
-    print("\n" + "═"*62)
-    print("  ForexML — Training Pipeline (Real Yahoo Finance Data)")
-    print(f"  Pairs: {len(pairs)}  |  Models: {len(models)}  |  Total: {total}")
-    print("═"*62)
-
-    csv_count = sum(
-        1 for p in pairs
-        if os.path.exists(os.path.join(DATA_DIR, f"{p.replace('/','_')}.csv"))
+    pairs = (
+        list(CURRENCY_PAIRS.keys())
+        if (args.all or not args.pair)
+        else [args.pair]
     )
-    if csv_count == 0:
-        print(f"\n  ⚠  No real data found in forex_data/")
-        print(f"  Run: python data_fetcher.py  (first time only)\n")
-    else:
-        print(f"\n  ✅ Real CSV data found for {csv_count}/{len(pairs)} pairs\n")
+
+    models = (
+        list(MODEL_REGISTRY.keys())
+        if (args.all or not args.model)
+        else [args.model]
+    )
 
     for pair in pairs:
         for model_name in models:
-            done += 1
-            print(f"\n  [{done}/{total}]", end=" ")
-            try:
-<<<<<<< HEAD
-                metrics = train_single_model(pair, model_name, days=args.days, force_train=args.force)
-=======
-                metrics = train_single_model(pair, model_name, days=args.days)
->>>>>>> be43cc49f9ed94f53c57c5b2259e5dc3cffc5841
-                summary.append(metrics)
-            except Exception as exc:
-                print(f"\n  ERROR: {pair}/{model_name}: {exc}")
 
-    print("\n\n" + "═"*80)
-    print("  TRAINING COMPLETE")
-    print("═"*80)
-    print(f"  {'Pair':<12} {'Model':<16} {'Src':<6} {'Accuracy':>9} {'MAE':>12} {'R²':>8} {'Rate':>12}")
-    print("  " + "─"*76)
-    for m in sorted(summary, key=lambda x: (-x["accuracy"], x["pair"])):
-        src = "REAL" if m["data_source"]=="REAL" else "SYNTH"
-        print(f"  {m['pair']:<12} {m['model']:<16} {src:<6} "
-              f"{m['accuracy']:>8.2f}%  {m['mae']:>12.6f} "
-              f"{m['r2']:>8.4f}  {m['latest_rate']:>12.4f}")
-    print("═"*80)
-    real_c  = sum(1 for m in summary if m["data_source"]=="REAL")
-    synth_c = len(summary) - real_c
-    print(f"\n  ✅ Trained   : {len(summary)}/{total}")
-    print(f"  🌐 Real data : {real_c} models")
-    print(f"  🔁 Synthetic : {synth_c} models")
-    print(f"  💾 Saved to  : {MODELS_DIR}/")
-    print(f"\n  Now run: python manage.py runserver\n")
+            try:
+                metrics = train_single_model(
+                    pair,
+                    model_name,
+                    days=args.days
+                )
+
+                print(metrics)
+
+            except Exception as exc:
+                print(f"ERROR: {pair}/{model_name}: {exc}")
 
 
 if __name__ == "__main__":
