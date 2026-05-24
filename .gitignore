@@ -1,8 +1,12 @@
 __pycache__/
 *.pyc
-*.pkl
-*.joblib
-*.csv
+*.pyo
+*.pyd
 *.sqlite3
+
 venv/
 .venv/
+
+.env
+staticfiles/
+media/
