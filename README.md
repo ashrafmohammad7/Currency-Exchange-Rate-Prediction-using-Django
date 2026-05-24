@@ -25,7 +25,7 @@ https://github.com/ashrafmohammad7/Currency-Exchange-Rate-Prediction-using-Djang
 - Deployment on Render
 
 ## System Architecture
-![System Architecture](screenshots/image.png)
+![System Architecture](image.png)
 
 ## Key Highlights
 
